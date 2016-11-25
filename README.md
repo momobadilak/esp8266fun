@@ -41,32 +41,23 @@ https://espressif.com/en/products/hardware/esp8266ex/resources
 ***
 
 # Product description from amazon page
+
+https://amzn.com/B00O34AGSU
+
 Esp8266 Serial Wifi Wireless Transceiver Module _Esp-01_ Arduino Compatible Switch
+
 Description:
-802.11 b/g/n
-Serial/UART baud rate: 115200 bps
-Integrated TCP/IP protocol stack
-Input power: 3.3V
-I/O voltage tolerance: 3.6V Max
-Regular operation current draw: ~70mA
-Peak operating current draw: ~300mA
-Power down leakage current: <10?A
-+19.5dBm output in 802.11b mode
-Flash Memory Size: 1MB (8Mbit)
-WiFi security modes: WPA, WPA2
-
-Other ESP modules / kits:
-
-Esp-02 http://www.amazon.com/dp/B00OSWG52I
-Esp-03 http://www.amazon.com/dp/B00OSWGA8M
-Esp-04 http://www.amazon.com/dp/B00OSWBQPE
-Esp-05 http://www.amazon.com/dp/B00OSWCGVW
-ESP-07 http://www.amazon.com/dp/B00PMURGFA
-ESP-12E http://www.amazon.com/dp/B00XJG7CYY
-ESP-12F http://www.amazon.com/dp/B015IF5TVQ
-UNO R3 kit http://www.amazon.com/dp/B017SCDJ64
-Kit without uno r3 board http://www.amazon.com/dp/B019A0MUHG
-Popular Kit http://www.amazon.com/dp/B00Q2CRM24
+- 802.11 b/g/n
+- Serial/UART baud rate: 115200 bps
+- Integrated TCP/IP protocol stack
+- Input power: 3.3V
+- I/O voltage tolerance: 3.6V Max
+- Regular operation current draw: ~70mA
+- Peak operating current draw: ~300mA
+- Power down leakage current: <10?A
+- +19.5dBm output in 802.11b mode
+- Flash Memory Size: 1MB (8Mbit)
+- WiFi security modes: WPA, WPA2
 
 
 ***
