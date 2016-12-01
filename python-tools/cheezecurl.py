@@ -27,72 +27,194 @@
 # This is a dirty little hack to test TCP and SSL functions of the ESP firmware.
 #
 
+import array
+import StringIO
+import time
+import sys
+import os
+
+# using pySerial library - : http://pythonhosted.org/pyserial/index.html
 import serial
 
 # was doing this on windows... but I suspect it will work on *nix without many issues
 USING_PORT     = "COM6"
 
-PORT_TIMEOUT_S = 2;
+PORT_TIMEOUT_S = 1;
+
+# want to cause stdout to flush immediatly
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
 
 def main():
     # open the port
     with serial.Serial(USING_PORT, 115200, timeout=PORT_TIMEOUT_S) as thePort:
-        print("opened port!,", thePort.name)
+        print "success opening serial port:", thePort.name
         startupCheck(thePort)
         dumpVersionInfo(thePort)
         listAPs(thePort)
-        httpGet(thePort,"someplace/something")
-        httpsGet(thePort,"someplace/something")
-        httpsPost(thePort,"someplace/something", "this is test data")
+        httpGet(thePort,"data.sparkfun.com", "/streams/mKlp5AVQ6XhdLwNpRd2Y.json")
+        #httpsGet(thePort,"www.google.com", "someplace/something")
+        #httpsPost(thePort,"someplace/something", "this is test data")
 
     thePort.close()
 
+    
 
 def startupCheck(espPort):
     print "startup check: \'AT\' by itself; then check for OK"
-    writeCmd(espPort,b'AT')
+    writeCmd(espPort,'AT')
     readUntilOk(espPort, maxLines=10, outputLines=False)
 
 
+    
 def dumpVersionInfo(espPort):
     print ""
     print "=== ESP VERSION INFO ==="
-    writeCmd(espPort,b'AT+GMR')
+    writeCmd(espPort,'AT+GMR')
     readUntilOk(espPort);
     print ""
 
+    
 
 def listAPs(espPort):
     print ""
     print "=== Access Points visible to the ESP radio ==="
-    writeCmd(espPort,b'AT+CWLAP')
+    writeCmd(espPort,'AT+CWLAP')
     readUntilOk(espPort, maxLines=50)
     print ""
+
+
+    
+def httpGet(espPort, host, path):
+
+    # we build the http request in a buffer before we go messing with the wifi device
+    respBuff = StringIO.StringIO()
+    reqBuff = StringIO.StringIO()
+    reqBuff.write('HEAD ' + path + ' HTTP/1.1' + "\r\n")
+    reqBuff.write("\r\n")
+
+    # this establishes a TCP connection.
+    # Note that I've found that some web servers I've connected to close the socket in 5 seconds
+    # if nothing is sent to them ...i.e. the request. So -- better not to wait around
+    fullCmd = 'AT+CIPSTART="TCP","' + host + '",80'
+    try:
+        writeCmd(espPort, fullCmd)
+        readUntilOk(espPort)
+
+        startTransparentMode(espPort);
+    
+        # write the HTTP request
+        writeBuffer(espPort, reqBuff)
+
+        # read the response
+        readBuffer(espPort, respBuff)
+    
+    finally:
+        # terminate transparent mode
+        endTransparentMode(espPort);
+
+        # close the TCP connection
+        writeCmd(espPort,'AT+CIPCLOSE');
+        readUntilOk(espPort)
+
+        # finally -- print the response
+        print respBuff.getvalue()
+
+        # cleanup
+        reqBuff.close()
+        respBuff.close()
+
+
+
+def writeBuffer(espPort, wrBuff):
+    """
+    buffer is a StringIO object
+    """
+    print "+writeBuffer"
+    espPort.write(wrBuff.getvalue())
+
     
 
-def httpGet(espPort, hostAndPath):
-    print "TODO"
+def readBuffer(espPort, respBuff):
+    """
+    respBuff is a StringIO object that will be written to
+    """
+    print "+readBuffer"
+    HTTP_RX_TIMEOUT_SECS = 10
+
+    # this loop trys to read data while its available in the read buffer,
+    # and starts a timer when no data is available ...no dater for longer than
+    # HTTP_RX_TIMEOUT_SECS and we give up with and exception
+    waitStart = 0
+    while True:
+        if espPort.in_waiting > 0 :
+
+            waitStart = 0;
+            # subject to serial port timeout config in PORT_TIMEOUT_S
+            rdData = espPort.read(256)
+            print "read # :", len(rdData)
+            print "R:", rdData
+            respBuff.write(rdData)
+
+        else:
+
+            if waitStart == 0:
+                waitStart = time.time()
+            else:
+                if (time.time() - waitStart) >= HTTP_RX_TIMEOUT_SECS:
+                    raise RuntimeError("timeout waiting for HTTP response data")
+
+
+
+def startTransparentMode(espPort):
+    print "+startTransparentMode",
+    
+    writeCmd(espPort,'AT+CIPMODE=1')
+    readUntilOk(espPort)
+    writeCmd(espPort,'AT+CIPSEND');
+    readUntilOk(espPort)
+    readUntilToken(espPort, successTok=">")
+
+    
+
+def endTransparentMode(espPort):
+    espPort.write(array.array("B", '+++'))
+    # we're supposed to wait 1 second before sending the next AT command after existing transparent mode with +++ token
+    time.sleep(1)
+    writeCmd(espPort,'AT+CIPMODE=0')
+    readUntilOk(espPort)
+
+    
 
 def httpsGet(espPort, hostAndPath):
     print "TODO"
 
+
+    
 def httpsPost(espPort, hostAndPath, data):
     print "TODO"
+
+
     
 def writeCmd(espPort,cmdTxt):
-    espPort.write(cmdTxt)
-    espPort.write(b'\r\n')
+    espPort.write(array.array("B", cmdTxt+"\r\n"))
+
     
+
 def readUntilOk(espPort, maxLines=15, outputLines=True):
+    readUntilToken(espPort, maxLines, outputLines)
+
+
+    
+def readUntilToken(espPort, maxLines=15, outputLines=True, successTok="OK", errorTok="ERROR"):
 
     while maxLines > 0:
         
         # this readline() will be subject to PORT_TIMEOUT_S seconds
         espResp = espPort.readline();
 
-        if espResp.find("OK") == 0:
+        if espResp.find(successTok) == 0:
             return True;
-        elif espResp.find("ERROR")== 0:
+        elif espResp.find(errorTok)== 0:
            raise RuntimeError("detected ERROR response from ESP")
 
         if outputLines:
@@ -101,6 +223,7 @@ def readUntilOk(espPort, maxLines=15, outputLines=True):
         maxLines-=1
 
     raise RuntimeError("failed to OK or ERROR status after max search tries!")
-        
+
+
 
 main()
